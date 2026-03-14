@@ -1,22 +1,93 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type Stage = "idle" | "uploading" | "blueprint";
 
+const DEMO_JOB_TITLE = "AI Engineer Intern";
+
+const DEMO_JOB_DESCRIPTION = `Role Overview
+
+We are looking for a Python Developer - Agentic AI to join our growing AI team.
+
+You will work on building intelligent, production-ready AI systems using modern LLM frameworks and backend technologies. This role offers hands-on exposure to real-world AI product development.
+
+Key Responsibilities
+
+Build agentic AI workflows (tool usage, multi-step reasoning, decision flows)
+Develop and maintain RAG (Retrieval-Augmented Generation) pipelines
+Integrate LLM APIs (OpenAI, Anthropic, etc.) into live products
+Design and maintain scalable FastAPI-based backend services
+Work on API integrations, databases, and third-party services
+Write clean, scalable, and production-ready Python code
+Collaborate closely with product and engineering teams
+
+Required Qualification
+
+B.Tech / B.E. in Computer Science, AI, Data Science, Mathematics, or related field
+Strong foundation in Mathematics (Statistics, Probability, Linear Algebra)
+
+Must Have Skills
+
+Strong Python fundamentals (OOP, async programming, API design, error handling)
+Hands-on experience with FastAPI or Flask
+Experience integrating LLMs (OpenAI / Anthropic or similar APIs)
+Understanding of RAG pipelines
+Basic knowledge of Vector Databases
+Strong grasp of Statistics & Probability
+API integration & JSON handling
+Git and clean coding practices
+
+Good to Have
+
+Experience with LangChain / LlamaIndex
+Knowledge of Vector Databases (pgvector, Pinecone, Weaviate)
+Basic understanding of Docker
+Prompt engineering experience
+0-24 months of experience in Python / AI development
+OR
+Strong AI/ML academic projects
+Freshers must showcase real AI projects on GitHub.
+
+Why to join us?
+
+Competitive salary package
+High-growth AI exposure in live products
+Opportunity to work on next-gen Agentic AI systems
+Collaborative and innovative work culture
+
+Industry
+
+IT Services and IT Consulting
+
+Employment Type
+
+Full-time
+
+Job Types: Full-time, Permanent
+
+Pay: Rs20,000.00 - Rs40,000.00 per month
+
+Benefits:
+
+Health insurance
+Paid sick time
+Paid time off
+Provident Fund`;
+
 export default function HomePage() {
   const router = useRouter();
+  const cvInputRef = useRef<HTMLInputElement | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [jobTitle, setJobTitle] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [usePreloadedDetails, setUsePreloadedDetails] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function startInterview(formData: FormData) {
     setError(null);
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
 
     try {
       setStage("uploading");
@@ -66,6 +137,44 @@ export default function HomePage() {
     }
   }
 
+  async function appendDemoResume(formData: FormData) {
+    const demoResumeResponse = await fetch("/demo/Luckman_AIResume.pdf");
+
+    if (!demoResumeResponse.ok) {
+      throw new Error("The bundled demo resume could not be loaded.");
+    }
+
+    const demoResumeBlob = await demoResumeResponse.blob();
+    formData.append(
+      "cv",
+      new File([demoResumeBlob], "Luckman_AIResume.pdf", {
+        type: "application/pdf",
+      }),
+    );
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const selectedCv = formData.get("cv");
+    const hasUploadedCv = selectedCv instanceof File && selectedCv.size > 0;
+
+    if (!hasUploadedCv) {
+      if (!usePreloadedDetails) {
+        setError("Please upload a CV PDF or use the pre loaded details.");
+        return;
+      }
+
+      formData.delete("cv");
+      await appendDemoResume(formData);
+    }
+
+    await startInterview(formData);
+  }
+
   const loadingText =
     stage === "uploading"
       ? "Parsing your CV..."
@@ -103,17 +212,42 @@ export default function HomePage() {
           <div className="rounded-[2rem] border border-slate-800 bg-slate-900/85 p-8 shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-200" htmlFor="cv">
-                  CV (PDF only)
-                </label>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-slate-200" htmlFor="cv">
+                    CV (PDF only)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJobTitle(DEMO_JOB_TITLE);
+                      setJobDescription(DEMO_JOB_DESCRIPTION);
+                      setUsePreloadedDetails(true);
+
+                      if (cvInputRef.current) {
+                        cvInputRef.current.value = "";
+                      }
+                    }}
+                    disabled={stage !== "idle" || isPending}
+                    className="text-xs font-medium text-blue-300 transition hover:text-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Autofill Demo details
+                  </button>
+                </div>
                 <input
+                  ref={cvInputRef}
                   id="cv"
                   name="cv"
                   type="file"
                   accept="application/pdf"
-                  required
+                  onChange={() => setUsePreloadedDetails(false)}
                   className="block w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-blue-500 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
                 />
+                {usePreloadedDetails ? (
+                  <p className="mt-2 text-xs text-slate-400">
+                    Demo resume ready. The bundled PDF, role, and job description will be used
+                    when you start the interview.
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -128,6 +262,8 @@ export default function HomePage() {
                   name="jobTitle"
                   type="text"
                   required
+                  value={jobTitle}
+                  onChange={(event) => setJobTitle(event.target.value)}
                   placeholder="Senior Product Analyst"
                   className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-blue-400"
                 />
@@ -142,6 +278,8 @@ export default function HomePage() {
                   name="jd"
                   required
                   rows={12}
+                  value={jobDescription}
+                  onChange={(event) => setJobDescription(event.target.value)}
                   placeholder="Paste the full job description here..."
                   className="w-full rounded-3xl border border-slate-700 bg-slate-950 px-4 py-4 text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-blue-400"
                 />

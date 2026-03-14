@@ -37,6 +37,23 @@ function extractJsonPayload(text: string) {
   return match[0];
 }
 
+function normalizeOpeningQuestion(question: string | null | undefined) {
+  const trimmed = question?.trim() ?? "";
+  const lower = trimmed.toLowerCase();
+
+  if (
+    !trimmed ||
+    lower.includes("project") ||
+    lower.includes("built") ||
+    lower.includes("developed") ||
+    lower.includes("tell me about your project")
+  ) {
+    return "To begin, could you briefly introduce yourself and walk me through your core skills in Python, AI, and backend development?";
+  }
+
+  return trimmed;
+}
+
 async function generateBlueprint(
   cvText: string,
   jdText: string,
@@ -58,7 +75,7 @@ Return one compact JSON object with exactly these rules:
 - topics_to_cover: exactly 5 short strings
 - skill_gaps: up to 3 short strings
 - red_flags: up to 2 short strings
-- opening_question: exactly 1 interview question
+- opening_question: exactly 1 easy, generic opening interview question about the candidate's background and core skills, not about any specific project, company, or internship
 - difficulty_progression: exactly "easy -> medium -> hard -> scenario"
 - total_questions_target: exactly 8
 
@@ -75,12 +92,13 @@ Generate a compact interview blueprint as JSON with exactly these fields:
   "topics_to_cover": ["exactly 5 concise topics"],
   "skill_gaps": ["up to 3 concise skill gaps"],
   "red_flags": ["up to 2 concise probe points"],
-  "opening_question": "one precise opening interview question",
+  "opening_question": "one easy, generic opening interview question about the candidate's background and core skills, not about any specific project, company, or internship",
   "difficulty_progression": "easy -> medium -> hard -> scenario",
   "total_questions_target": 8
 }
 
-Keep the JSON concise and do not include markdown.`;
+Keep the JSON concise and do not include markdown.
+The opening_question must be broad, friendly, and skills-focused.`;
 
   const response = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -92,7 +110,12 @@ Keep the JSON concise and do not include markdown.`;
     },
   });
 
-  return JSON.parse(extractJsonPayload(response.response.text())) as InterviewBlueprint;
+  const blueprint = JSON.parse(extractJsonPayload(response.response.text())) as InterviewBlueprint;
+
+  return {
+    ...blueprint,
+    opening_question: normalizeOpeningQuestion(blueprint.opening_question),
+  };
 }
 
 export async function POST(request: Request) {

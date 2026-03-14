@@ -29,6 +29,7 @@ export function InterviewClient({
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [isEndingInterview, setIsEndingInterview] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -145,7 +146,12 @@ export function InterviewClient({
   }
 
   async function handleEndInterview() {
+    if (isEndingInterview) {
+      return;
+    }
+
     setError(null);
+    setIsEndingInterview(true);
 
     try {
       const response = await fetch("/api/report/generate", {
@@ -169,6 +175,7 @@ export function InterviewClient({
       setError(
         endError instanceof Error ? endError.message : "Failed to end interview cleanly.",
       );
+      setIsEndingInterview(false);
     }
   }
 
@@ -185,10 +192,10 @@ export function InterviewClient({
           <button
             type="button"
             onClick={handleEndInterview}
-            disabled={isPending}
+            disabled={isPending || isEndingInterview}
             className="rounded-full border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            End Interview
+            {isEndingInterview ? "Ending interview..." : "End Interview"}
           </button>
         </div>
       </header>
@@ -228,6 +235,14 @@ export function InterviewClient({
         </div>
       ) : null}
 
+      {isEndingInterview ? (
+        <div className="mx-auto mb-4 w-full max-w-5xl px-6">
+          <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
+            Ending the interview and preparing your report...
+          </div>
+        </div>
+      ) : null}
+
       {isComplete ? (
         <div className="border-t border-slate-800 bg-slate-900 px-6 py-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
@@ -238,10 +253,10 @@ export function InterviewClient({
             <button
               type="button"
               onClick={handleEndInterview}
-              disabled={isPending}
+              disabled={isPending || isEndingInterview}
               className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Generate Report
+              {isEndingInterview ? "Generating Report..." : "Generate Report"}
             </button>
           </div>
         </div>
@@ -253,12 +268,13 @@ export function InterviewClient({
               onChange={(event) => setAnswer(event.target.value)}
               rows={3}
               placeholder="Type your answer here..."
-              className="min-h-[84px] flex-1 rounded-3xl border border-slate-700 bg-slate-950 px-5 py-4 text-sm leading-6 text-white outline-none transition focus:border-blue-400"
+              disabled={isEndingInterview}
+              className="min-h-[84px] flex-1 rounded-3xl border border-slate-700 bg-slate-950 px-5 py-4 text-sm leading-6 text-white outline-none transition focus:border-blue-400 disabled:opacity-60"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={isSending || !answer.trim()}
+              disabled={isSending || isEndingInterview || !answer.trim()}
               className="self-end rounded-full bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-600"
             >
               {isSending ? "Sending..." : "Send"}
