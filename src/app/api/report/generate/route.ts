@@ -5,6 +5,16 @@ import { ensureRedisConnection } from "@/lib/redis";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import type { InterviewBlueprint, InterviewReport } from "@/types";
 
+function compactContext(text: string | null | undefined, maxChars: number) {
+  const normalized = (text ?? "").replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
 function extractJsonPayload(text: string) {
   const trimmed = text.trim();
   const withoutCodeFence = trimmed
@@ -25,6 +35,69 @@ function extractJsonPayload(text: string) {
   }
 
   return match[0];
+}
+
+async function generateReport(
+  jdText: string,
+  blueprint: InterviewBlueprint,
+  transcript: string,
+  conciseMode = false,
+) {
+  const model = getGeminiModel(
+    "You are an expert HR analyst evaluating interview performance. Return valid JSON only.",
+  );
+
+  const prompt = conciseMode
+    ? `Job Description Summary:
+${jdText}
+
+Interview Blueprint:
+${JSON.stringify(blueprint)}
+
+Interview Transcript Summary:
+${transcript}
+
+Return one compact JSON object with exactly these rules:
+- overall_score: integer between 0 and 100
+- strengths: exactly 3 short strings
+- weaknesses: exactly 3 short strings
+- topics_covered: up to 5 short strings
+- topics_missed: up to 5 short strings
+- recommended_focus: 2 concise sentences
+
+Do not add any extra keys. Keep every value concise.`
+    : `Job Description:
+${jdText}
+
+Interview Blueprint:
+${JSON.stringify(blueprint)}
+
+Interview Transcript:
+${transcript}
+
+Evaluate the candidate and return compact JSON with exactly these fields:
+{
+  "overall_score": "integer between 0 and 100",
+  "strengths": ["exactly 3 concise strengths"],
+  "weaknesses": ["exactly 3 concise weaknesses"],
+  "topics_covered": ["up to 5 concise topics"],
+  "topics_missed": ["up to 5 concise topics"],
+  "recommended_focus": "2 concise sentences"
+}
+
+Keep the JSON concise and do not include markdown.`;
+
+  const response = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: conciseMode ? 1024 : 1800,
+      temperature: 0.2,
+      responseMimeType: "application/json",
+      responseSchema: interviewReportSchema,
+    },
+  });
+
+  return JSON.parse(extractJsonPayload(response.response.text())) as InterviewReport;
 }
 
 export async function POST(request: Request) {
@@ -95,42 +168,30 @@ export async function POST(request: Request) {
     const transcript = (questions ?? [])
       .map((turn) => `Q: ${turn.question ?? ""}\nA: ${turn.answer ?? ""}`)
       .join("\n\n");
+    const primaryJdText = compactContext(sessionResponse.data.jd_text, 4500);
+    const primaryTranscript = compactContext(transcript, 7000);
+    const fallbackJdText = compactContext(sessionResponse.data.jd_text, 2200);
+    const fallbackTranscript = compactContext(transcript, 3200);
 
-    const model = getGeminiModel(
-      "You are an expert HR analyst evaluating an interview performance. Respond with JSON only. No explanation, no markdown, just raw JSON.",
-    );
-    const response = await model.generateContent({
-      contents: [
-        { role: "user", parts: [{ text: `Job Description:
-${sessionResponse.data.jd_text ?? ""}
+    let report: InterviewReport;
 
-Interview Blueprint (what was supposed to be covered):
-${JSON.stringify(blueprint)}
+    try {
+      report = await generateReport(primaryJdText, blueprint, primaryTranscript);
+    } catch (primaryError) {
+      const message =
+        primaryError instanceof Error ? primaryError.message : "Report generation failed.";
 
-Full Interview Transcript:
-${transcript}
+      if (!message.includes("valid JSON")) {
+        throw primaryError;
+      }
 
-Evaluate the candidate's performance and return this exact JSON:
-{
-  "overall_score": number between 0 and 100,
-  "strengths": ["array of 3 specific strengths with brief explanation"],
-  "weaknesses": ["array of 3 specific weaknesses with brief explanation"],
-  "topics_covered": ["topics that were adequately addressed"],
-  "topics_missed": ["topics from blueprint not covered or poorly answered"],
-  "recommended_focus": 
-    "one paragraph: what the candidate should focus on before the HR session"
-}` }] },
-      ],
-      generationConfig: {
-        maxOutputTokens: 1500,
-        responseMimeType: "application/json",
-        responseSchema: interviewReportSchema,
-      },
-    });
-
-    const textResponse = response.response.text();
-
-    const report = JSON.parse(extractJsonPayload(textResponse)) as InterviewReport;
+      report = await generateReport(
+        fallbackJdText,
+        blueprint,
+        fallbackTranscript,
+        true,
+      );
+    }
 
     const insertReport = await supabase.from("interview_reports").insert({
       session_id: sessionId,
