@@ -14,6 +14,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.99.1",
     "@vercel/analytics": "^2.0.1",
+    "elevenlabs": "^1.59.0",
     "ioredis": "^5.10.0",
     "next": "16.1.6",
     "pdf-parse": "^1.1.1",

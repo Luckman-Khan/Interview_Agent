@@ -37,9 +37,16 @@ function extractJsonPayload(text: string) {
   return match[0];
 }
 
-function normalizeOpeningQuestion(question: string | null | undefined) {
+function normalizeOpeningQuestion(blueprint: InterviewBlueprint) {
+  const question = blueprint.opening_question;
   const trimmed = question?.trim() ?? "";
   const lower = trimmed.toLowerCase();
+  const primaryTopic = blueprint.topics_to_cover[0]?.trim();
+  const secondaryTopic = blueprint.topics_to_cover[1]?.trim();
+
+  const derivedTopics = [primaryTopic, secondaryTopic].filter(
+    (topic): topic is string => Boolean(topic),
+  );
 
   if (
     !trimmed ||
@@ -48,7 +55,15 @@ function normalizeOpeningQuestion(question: string | null | undefined) {
     lower.includes("developed") ||
     lower.includes("tell me about your project")
   ) {
-    return "To begin, could you briefly introduce yourself and walk me through your core skills in Python, AI, and backend development?";
+    if (derivedTopics.length >= 2) {
+      return `To begin, could you briefly introduce yourself and walk me through your background in ${derivedTopics[0]} and ${derivedTopics[1]}?`;
+    }
+
+    if (derivedTopics.length === 1) {
+      return `To begin, could you briefly introduce yourself and tell me about your core skills in ${derivedTopics[0]}?`;
+    }
+
+    return "To begin, could you briefly introduce yourself and walk me through the core skills you feel are most relevant for this role?";
   }
 
   return trimmed;
@@ -114,7 +129,7 @@ The opening_question must be broad, friendly, and skills-focused.`;
 
   return {
     ...blueprint,
-    opening_question: normalizeOpeningQuestion(blueprint.opening_question),
+    opening_question: normalizeOpeningQuestion(blueprint),
   };
 }
 
