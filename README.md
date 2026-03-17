@@ -78,7 +78,6 @@ supabase-schema.sql                       Database schema
 Create a `.env.local` file in the project root.
 
 ```env
-ANTHROPIC_API_KEY=
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
 
