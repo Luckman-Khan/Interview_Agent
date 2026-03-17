@@ -1,224 +1,228 @@
 # Mock Interview Agent
 
-An AI-powered mock interview platform that simulates a real, voice-driven interview experience. Built as part of the JSO Phase-2 Agentic Career Intelligence ecosystem.
+A Next.js mock interview application that lets a user upload a CV, paste a job description, run a Gemini-powered interview, answer by typing or speaking, and receive a structured performance report.
 
----
+## Current Scope
 
-## What It Does
+The current project is a single Next.js app with API routes. It does not use a separate Python microservice or LangGraph runtime.
 
-1. User uploads their CV and pastes a Job Description
-2. The system parses the CV and generates a personalised Interview Blueprint
-3. A voice-first interview begins — the agent asks questions, the user speaks answers
-4. The agent autonomously decides its next action after each answer (probe deeper, advance topic, challenge, or close)
-5. A performance report is generated and delivered to both the user and the HR Consultant Dashboard
+The live flow is:
 
----
+1. Upload a PDF CV and paste a job description
+2. Parse the CV and store session data
+3. Generate an interview blueprint with Gemini
+4. Run the interview turn by turn
+5. Read each question aloud with ElevenLabs TTS
+6. Let the candidate answer by typing or recording voice
+7. Transcribe recorded answers with ElevenLabs STT
+8. Generate a final interview report with Gemini
+
+## Features
+
+- PDF CV upload and text extraction with `pdf-parse`
+- Demo autofill flow with a bundled sample resume
+- Gemini-based interview blueprint generation
+- Gemini-based interview question flow
+- ElevenLabs text-to-speech for spoken interview questions
+- ElevenLabs speech-to-text for recorded answers
+- Redis-backed interview session state
+- Supabase-backed session, question, and report storage
+- S3 upload for CV file storage
+- Dark-theme interview and report experience
+- Vercel Analytics integration
 
 ## Tech Stack
 
-### Frontend + API (JavaScript/TypeScript)
-- **Next.js 14** — Frontend and API routes
-- **Node.js** — API Gateway, session routing, quota enforcement
-- **Vercel** — Hosting
-
-### AI Layer (Python Microservice)
-- **Python + FastAPI** — Exposes the agentic loop as an internal HTTP endpoint
-- **LangGraph** — StateGraph with conditional edges for autonomous decision making
-- **Gemini 2.5 Flash** — Blueprint generation, structuring, agentic loop reasoning
-- **Gemini 3.1 Pro** — Final report synthesis
-
-### AWS Services
-- **AWS S3** — CV storage and PDF report storage
-- **AWS Textract** — Layout-aware CV parsing
-- **AWS Transcribe** — Real-time speech to text
-- **AWS Lambda** — Serverless compute for upload, blueprint, scoring, report routes
-- **AWS ElastiCache (Redis)** — Sub-millisecond live session state
-
-### Google Cloud
-- **Google Cloud TTS (Neural2)** — Voices interview questions aloud
-
-### Database
-- **Supabase (PostgreSQL)** — Blueprint, scores, structured report data
-
----
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Gemini (`@google/generative-ai`)
+- ElevenLabs
+- Supabase
+- Redis (`ioredis`)
+- AWS S3
 
 ## Project Structure
 
-```
-mock-interview-agent/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx                    # Landing page — CV + JD upload
-│   │   ├── interview/
-│   │   │   └── [sessionId]/
-│   │   │       └── page.tsx            # Live interview chat UI
-│   │   ├── report/
-│   │   │   └── [sessionId]/
-│   │   │       └── page.tsx            # Performance report display
-│   │   └── api/
-│   │       ├── upload/route.ts         # CV upload + S3 + pdf-parse
-│   │       ├── blueprint/route.ts      # Blueprint generation
-│   │       ├── interview/
-│   │       │   └── turn/route.ts       # Calls Python FastAPI agent service
-│   │       └── report/
-│   │           └── generate/route.ts   # Report synthesis
-│   ├── lib/
-│   │   ├── supabase.ts                 # Supabase client
-│   │   ├── redis.ts                    # Redis client
-│   │   └── s3.ts                       # S3 upload helper
-│   └── types/
-│       └── index.ts                    # Shared TypeScript interfaces
-│
-└── agent-service/                      # Python FastAPI microservice
-    ├── main.py                         # FastAPI app — POST /agent/turn
-    ├── graph.py                        # LangGraph StateGraph definition
-    ├── tools.py                        # ask_followup, advance_topic, challenge, close_interview
-    ├── state.py                        # InterviewState schema
-    └── requirements.txt
-```
+```text
+src/
+  app/
+    page.tsx                              Landing page
+    interview/[sessionId]/
+      page.tsx                            Interview page loader
+      InterviewClient.tsx                 Interview UI, TTS, STT, text fallback
+    report/[sessionId]/
+      page.tsx                            Report page loader
+      ReportClient.tsx                    Report UI
+    api/
+      upload/route.ts                     CV upload, parse, session creation
+      blueprint/route.ts                  Interview blueprint generation
+      interview/
+        turn/route.ts                     Interview turn streaming
+        speak/route.ts                    ElevenLabs TTS proxy
+        transcribe/route.ts               ElevenLabs STT proxy
+      report/generate/route.ts            Final report generation
+  lib/
+    gemini.ts                             Gemini client and schemas
+    redis.ts                              Redis client
+    s3.ts                                 S3 helper
+    supabase.ts                           Supabase clients
+  types/
+    index.ts                              Shared TypeScript types
 
----
+public/
+  demo/Luckman_AIResume.pdf               Bundled demo resume
+
+supabase-schema.sql                       Database schema
+```
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+Create a `.env.local` file in the project root.
 
 ```env
-# Gemini
-GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
 
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# AWS
 AWS_REGION=ap-south-1
-AWS_ACCESS_KEY_ID=your_aws_access_key_here
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
-S3_BUCKET_NAME=your_bucket_name_here
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+S3_BUCKET_NAME=your_bucket_name
 
-# Redis (Upstash)
 REDIS_URL=rediss://default:your_password@your_host.upstash.io:6379
+
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+ELEVENLABS_VOICE_ID=your_elevenlabs_voice_id
 ```
 
-Create a `.env` file inside `agent-service/`:
+Notes:
 
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-REDIS_URL=rediss://default:your_password@your_host.upstash.io:6379
-```
+- `GEMINI_MODEL` is optional. The app defaults to `gemini-2.5-flash`.
+- `ELEVENLABS_VOICE_ID` controls the interview voice used by `/api/interview/speak`.
+- Keep `.env.local` out of version control.
 
-> Never commit `.env.local` or `.env` to version control. Both are already covered by `.gitignore` in a standard Next.js project.
+## Setup
 
----
-
-## Database Setup
-
-Copy the contents of `supabase-schema.sql` (included in the project root) and run it in your Supabase SQL Editor.
-
-Go to your Supabase project → SQL Editor → New Query → paste → Run.
-
-Once successful, three tables will appear in your Table Editor:
-- `interview_sessions`
-- `interview_questions`
-- `interview_reports`
-
----
-
-## Getting Started
-
-### 1. Install Next.js dependencies
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Install Python dependencies
+2. Apply the database schema
 
-```bash
-cd agent-service
-pip install -r requirements.txt
-```
+Run `supabase-schema.sql` in your Supabase SQL editor.
 
-### 3. Run the Python agent service
-
-```bash
-cd agent-service
-uvicorn main:app --reload --port 8000
-```
-
-### 4. Run the Next.js app
+3. Start the app
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`
+4. Open the app
 
----
-
-## How the Agentic Loop Works
-
-The interview turn is powered by a **LangGraph StateGraph** running inside the Python FastAPI service. On every turn:
-
-```
-User speaks answer
-      ↓
-AWS Transcribe converts to text
-      ↓
-Redis fetches full conversation history
-      ↓
-reason_and_decide node (Gemini 2.5 Flash)
-autonomously selects one of four tools:
-      ↓
-┌─────────────────┬──────────────────┬───────────┬─────────────────┐
-│  ask_followup   │  advance_topic   │ challenge │ close_interview │
-│  Probe deeper   │  Move forward    │ Push back │  Wrap up        │
-└─────────────────┴──────────────────┴───────────┴─────────────────┘
-      ↓
-Google Cloud TTS voices the next question
-      ↓
-Node.js streams audio back to browser
+```text
+http://localhost:3000
 ```
 
-Node.js calls the Python service via a single HTTP request:
+## Demo Flow
 
+The landing page includes an `Autofill Demo details` action.
+
+When used, the app:
+
+- fills the role and job description
+- uses the bundled sample resume
+- lets reviewers try the interview without searching for files first
+
+## How the Interview Works
+
+### 1. Upload
+
+`/api/upload`
+
+- validates the uploaded PDF
+- parses the CV text with `pdf-parse`
+- uploads the file to S3
+- stores the session in Supabase
+
+### 2. Blueprint
+
+`/api/blueprint`
+
+- sends the CV and job description to Gemini
+- creates a structured blueprint:
+  - role summary
+  - topics to cover
+  - skill gaps
+  - red flags
+  - opening question
+  - difficulty progression
+
+### 3. Interview
+
+`/api/interview/turn`
+
+- uses the saved blueprint, CV summary, job description, and conversation history
+- streams one question at a time
+- probes deeper when answers are vague
+- ends after the configured question count
+
+### 4. Voice Layer
+
+`/api/interview/speak`
+
+- converts each assistant question into audio using ElevenLabs TTS
+
+`/api/interview/transcribe`
+
+- sends recorded audio to ElevenLabs STT
+- returns transcript text for the answer box
+
+### 5. Report
+
+`/api/report/generate`
+
+- evaluates the finished interview with Gemini
+- stores the report in Supabase
+- returns the structured report to the UI
+
+## Current Behaviour Notes
+
+- The interview flow is adaptive, but the overall system is still mostly linear:
+  upload -> blueprint -> interview -> report
+- The first question is intentionally kept broad and easier than later questions
+- Voice and typed answers coexist; typing remains the fallback path
+- Silent voice captures can auto-send after transcription, while manual mic stops leave the text editable
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
 ```
-POST http://localhost:8000/agent/turn
-{ session_id, user_answer, blueprint, questions_asked }
-```
 
----
+## Known Limitations
 
-## Agent Outputs
+- The interview loop is prompt-driven, not a full agentic controller
+- Voice quality and transcription accuracy depend on browser mic support and ElevenLabs responses
+- The `elevenlabs` package currently shows a deprecation warning, but the app uses direct `fetch` calls for the ElevenLabs routes
+- Authentication is still prototype-level
+- The report is rendered in-app rather than exported as a PDF
 
-| Output | When Generated | Model |
-|---|---|---|
-| Discussion Topics | Blueprint generation (pre-session) | Gemini 2.5 Flash |
-| Career Questions | Every conversation turn (adaptive) | Gemini 2.5 Flash |
-| Interview Prep Advice | End of session report | Gemini 3.1 Pro |
+## Useful Files
 
----
-
-## Prototype Limitations
-
-The current prototype intentionally excludes:
-
-- User authentication (hardcoded `prototype-user`)
-- AWS Textract (replaced with `pdf-parse` for cost)
-- AWS Transcribe (text input only in prototype)
-- Google Cloud TTS (text responses only in prototype)
-- PDF report generation (report shown as UI cards)
-- HR Consultant Dashboard (only User Dashboard implemented)
-
-These are all designed and documented in the architecture but deferred from the prototype build.
-
----
-
-## Built For
-
-JSO Phase-2 — Agentic Career Intelligence Ecosystem
-Aariyatech Corp Private Limited — Agentic AI Engineer Intern Assignment
+- [src/app/page.tsx](C:/Projects/Interview_Agent/GPT_5.4/src/app/page.tsx)
+- [src/app/api/blueprint/route.ts](C:/Projects/Interview_Agent/GPT_5.4/src/app/api/blueprint/route.ts)
+- [src/app/api/interview/turn/route.ts](C:/Projects/Interview_Agent/GPT_5.4/src/app/api/interview/turn/route.ts)
+- [src/app/api/interview/speak/route.ts](C:/Projects/Interview_Agent/GPT_5.4/src/app/api/interview/speak/route.ts)
+- [src/app/api/interview/transcribe/route.ts](C:/Projects/Interview_Agent/GPT_5.4/src/app/api/interview/transcribe/route.ts)
+- [src/app/api/report/generate/route.ts](C:/Projects/Interview_Agent/GPT_5.4/src/app/api/report/generate/route.ts)
