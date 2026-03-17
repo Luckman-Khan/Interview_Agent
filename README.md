@@ -2,10 +2,6 @@
 
 A Next.js mock interview application that lets a user upload a CV, paste a job description, run a Gemini-powered interview, answer by typing or speaking, and receive a structured performance report.
 
-## Current Scope
-
-The current project is a single Next.js app with API routes. It does not use a separate Python microservice or LangGraph runtime.
-
 The live flow is:
 
 1. Upload a PDF CV and paste a job description
@@ -82,7 +78,6 @@ supabase-schema.sql                       Database schema
 Create a `.env.local` file in the project root.
 
 ```env
-ANTHROPIC_API_KEY=
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
 
