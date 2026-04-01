@@ -15,8 +15,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "An audio file is required." }, { status: 400 });
     }
 
+    console.info("Transcribe request received:", {
+      name: audioFile.name,
+      size: audioFile.size,
+      type: audioFile.type,
+    });
+
     const normalizedAudioFile = new File([audioFile], audioFile.name || "answer.webm", {
       type: "audio/webm",
+    });
+
+    console.info("Forwarding audio to ElevenLabs:", {
+      name: normalizedAudioFile.name,
+      size: normalizedAudioFile.size,
+      type: normalizedAudioFile.type,
+      model_id: "scribe_v1",
+      field: "file",
     });
 
     const formData = new FormData();
@@ -60,6 +74,10 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to transcribe audio.";
+    console.error("Transcribe route failed:", {
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

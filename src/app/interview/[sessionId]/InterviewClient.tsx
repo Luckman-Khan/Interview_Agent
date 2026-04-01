@@ -286,7 +286,7 @@ export function InterviewClient({
       setIsTranscribing(true);
 
       const formData = new FormData();
-      formData.append("audio", new File([audioBlob], "answer.webm", { type: audioBlob.type }));
+      formData.append("audio", new File([audioBlob], "answer.webm", { type: "audio/webm" }));
 
       const response = await fetch("/api/interview/transcribe", {
         method: "POST",
