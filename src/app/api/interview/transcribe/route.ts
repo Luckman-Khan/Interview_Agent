@@ -15,8 +15,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "An audio file is required." }, { status: 400 });
     }
 
+    const normalizedAudioFile = new File([audioFile], audioFile.name || "answer.webm", {
+      type: "audio/webm",
+    });
+
     const formData = new FormData();
-    formData.append("file", audioFile, audioFile.name || "answer.webm");
+    formData.append("file", normalizedAudioFile, normalizedAudioFile.name);
     formData.append("model_id", "scribe_v1");
 
     const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
@@ -29,8 +33,20 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("ElevenLabs STT error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
 
-      throw new Error(errorText || "Failed to transcribe audio.");
+      return NextResponse.json(
+        {
+          error:
+            errorText ||
+            `ElevenLabs transcription failed with status ${response.status}.`,
+        },
+        { status: response.status },
+      );
     }
 
     const payload = (await response.json()) as { text?: string };
