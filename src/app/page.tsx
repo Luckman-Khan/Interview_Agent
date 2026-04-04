@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { toUserFriendlyError } from "@/lib/user-errors";
+
 type Stage = "idle" | "uploading" | "blueprint";
 
 const DEMO_JOB_TITLE = "AI Engineer Intern";
@@ -129,9 +131,12 @@ export default function HomePage() {
       });
     } catch (submitError) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "Something went wrong while starting the interview.",
+        toUserFriendlyError(
+          submitError instanceof Error
+            ? submitError.message
+            : "Something went wrong while starting the interview.",
+          "startup",
+        ),
       );
       setStage("idle");
     }

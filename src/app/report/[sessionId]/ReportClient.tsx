@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { toUserFriendlyError } from "@/lib/user-errors";
 import type { InterviewReport } from "@/types";
 
 type ReportClientProps = {
@@ -46,9 +47,12 @@ export function ReportClient({ sessionId, jobTitle }: ReportClientProps) {
       } catch (reportError) {
         if (isMounted) {
           setError(
-            reportError instanceof Error
-              ? reportError.message
-              : "Failed to generate report.",
+            toUserFriendlyError(
+              reportError instanceof Error
+                ? reportError.message
+                : "Failed to generate report.",
+              "report",
+            ),
           );
         }
       }

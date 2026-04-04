@@ -4,6 +4,8 @@ import { useEffect, useEffectEvent, useRef, useState, useTransition } from "reac
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 
+import { toUserFriendlyError } from "@/lib/user-errors";
+
 type ChatMessage = {
   role: "assistant" | "user";
   content: string;
@@ -38,6 +40,7 @@ export function InterviewClient({
   const [answer, setAnswer] = useState("");
   const [transcriptPreview, setTranscriptPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [isEndingInterview, setIsEndingInterview] = useState(false);
@@ -112,6 +115,12 @@ export function InterviewClient({
       await audio.play();
     } catch (audioError) {
       stopAudioPlayback();
+      setNotice(
+        toUserFriendlyError(
+          audioError instanceof Error ? audioError.message : "Failed to generate audio.",
+          "speech",
+        ),
+      );
       console.error("Question audio playback failed:", audioError);
     }
   });
@@ -167,6 +176,7 @@ export function InterviewClient({
 
     clearAutoSendTimer();
     setError(null);
+    setNotice(null);
     setIsSending(true);
     setMessages((current) => [
       ...current,
@@ -250,9 +260,12 @@ export function InterviewClient({
       }
     } catch (sendError) {
       setError(
-        sendError instanceof Error
-          ? sendError.message
-          : "Failed to continue the interview.",
+        toUserFriendlyError(
+          sendError instanceof Error
+            ? sendError.message
+            : "Failed to continue the interview.",
+          "interview",
+        ),
       );
 
       setMessages((current) => current.slice(0, -1));
@@ -310,9 +323,12 @@ export function InterviewClient({
       }
     } catch (transcriptionError) {
       setError(
-        transcriptionError instanceof Error
-          ? transcriptionError.message
-          : "Voice transcription failed. Please type your answer instead.",
+        toUserFriendlyError(
+          transcriptionError instanceof Error
+            ? transcriptionError.message
+            : "Voice transcription failed. Please type your answer instead.",
+          "speech",
+        ),
       );
     } finally {
       setIsTranscribing(false);
@@ -410,9 +426,12 @@ export function InterviewClient({
       cleanupRecordingResources();
       setIsRecording(false);
       setError(
-        recordingError instanceof Error
-          ? recordingError.message
-          : "Could not start voice recording.",
+        toUserFriendlyError(
+          recordingError instanceof Error
+            ? recordingError.message
+            : "Could not start voice recording.",
+          "speech",
+        ),
       );
     }
   }
@@ -445,7 +464,10 @@ export function InterviewClient({
       });
     } catch (endError) {
       setError(
-        endError instanceof Error ? endError.message : "Failed to end interview cleanly.",
+        toUserFriendlyError(
+          endError instanceof Error ? endError.message : "Failed to end interview cleanly.",
+          "report",
+        ),
       );
       setIsEndingInterview(false);
     }
@@ -511,6 +533,14 @@ export function InterviewClient({
         <div className="mx-auto mb-4 w-full max-w-5xl px-6">
           <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
+          </div>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="mx-auto mb-4 w-full max-w-5xl px-6">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {notice}
           </div>
         </div>
       ) : null}
