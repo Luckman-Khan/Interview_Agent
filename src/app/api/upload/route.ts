@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
-import { v4 as uuidv4 } from "uuid";
 
-import { uploadToS3 } from "@/lib/s3";
+import { logDetailedError } from "@/lib/debug";
 import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function POST(request: Request) {
   let sessionId: string | null = null;
+  let uploadStep = "start";
 
   try {
+    uploadStep = "parse-form-data";
     const formData = await request.formData();
     const cvFile = formData.get("cv");
     const jd = formData.get("jd");
@@ -46,8 +47,10 @@ export async function POST(request: Request) {
       );
     }
 
+    uploadStep = "create-supabase-client";
     const supabase = getSupabaseServerClient();
 
+    uploadStep = "insert-session-row";
     const sessionInsert = await supabase
       .from("interview_sessions")
       .insert({
@@ -67,8 +70,11 @@ export async function POST(request: Request) {
 
     sessionId = sessionInsert.data.id;
 
+    uploadStep = "read-pdf-buffer";
     const arrayBuffer = await cvFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    uploadStep = "parse-pdf";
     const parsedPdf = await pdfParse(buffer);
     const parsedText = parsedPdf.text?.trim();
 
@@ -76,15 +82,12 @@ export async function POST(request: Request) {
       throw new Error("No readable text could be extracted from the PDF.");
     }
 
-    const s3Key = `cvs/${uuidv4()}.pdf`;
-
-    await uploadToS3(buffer, s3Key, "application/pdf");
-
+    uploadStep = "update-session-row";
     const updateResult = await supabase
       .from("interview_sessions")
       .update({
         status: "ready",
-        cv_s3_key: s3Key,
+        cv_s3_key: null,
         cv_parsed_text: parsedText,
         jd_text: jd.trim(),
         job_title: jobTitle.trim(),
@@ -105,9 +108,22 @@ export async function POST(request: Request) {
           .update({ status: "uploading" })
           .eq("id", sessionId);
       } catch (updateError) {
-        console.error("Failed to preserve session state after upload error:", updateError);
+        logDetailedError("Failed to preserve session state after upload error", updateError, {
+          sessionId,
+          stage: "session-recovery",
+        });
       }
     }
+
+    logDetailedError("Upload route failed", error, {
+      sessionId,
+      stage: "upload",
+      uploadStep,
+      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+      hasSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      hasSupabaseServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      hasRedisUrl: Boolean(process.env.REDIS_URL),
+    });
 
     const message =
       error instanceof Error ? error.message : "Failed to upload and parse CV.";

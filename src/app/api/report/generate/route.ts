@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logDetailedError, safeUrlHost } from "@/lib/debug";
 import { getGeminiModel, interviewReportSchema } from "@/lib/gemini";
 import { ensureRedisConnection } from "@/lib/redis";
 import { getSupabaseServerClient } from "@/lib/supabase";
@@ -223,6 +224,14 @@ export async function POST(request: Request) {
       jobTitle: sessionResponse.data.job_title,
     });
   } catch (error) {
+    logDetailedError("Report route failed", error, {
+      stage: "report",
+      supabaseHost: safeUrlHost(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    });
+
     const message =
       error instanceof Error ? error.message : "Failed to generate report.";
 

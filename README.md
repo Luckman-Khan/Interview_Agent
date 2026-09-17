@@ -23,7 +23,6 @@ The live flow is:
 - ElevenLabs speech-to-text for recorded answers
 - Redis-backed interview session state
 - Supabase-backed session, question, and report storage
-- S3 upload for CV file storage
 - Dark-theme interview and report experience
 - Vercel Analytics integration
 
@@ -37,7 +36,6 @@ The live flow is:
 - ElevenLabs
 - Supabase
 - Redis (`ioredis`)
-- AWS S3
 
 ## Project Structure
 
@@ -62,7 +60,6 @@ src/
   lib/
     gemini.ts                             Gemini client and schemas
     redis.ts                              Redis client
-    s3.ts                                 S3 helper
     supabase.ts                           Supabase clients
   types/
     index.ts                              Shared TypeScript types
@@ -84,11 +81,6 @@ GEMINI_MODEL=gemini-2.5-flash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-AWS_REGION=ap-south-1
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-S3_BUCKET_NAME=your_bucket_name
 
 REDIS_URL=rediss://default:your_password@your_host.upstash.io:6379
 
@@ -144,8 +136,7 @@ When used, the app:
 
 - validates the uploaded PDF
 - parses the CV text with `pdf-parse`
-- uploads the file to S3
-- stores the session in Supabase
+- stores the parsed CV text and session in Supabase
 
 ### 2. Blueprint
 

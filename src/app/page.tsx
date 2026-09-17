@@ -116,6 +116,7 @@ export default function HomePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ sessionId: uploadResult.sessionId }),
+        signal: AbortSignal.timeout(90_000),
       });
 
       const blueprintResult = (await blueprintResponse.json()) as {
@@ -192,10 +193,7 @@ export default function HomePage() {
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-6xl items-center">
         <section className="grid w-full gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="flex flex-col justify-center">
-            <div className="inline-flex w-fit rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1 text-sm font-medium text-blue-200 shadow-sm backdrop-blur">
-              Job Search Optimiser
-            </div>
-            <h1 className="mt-6 max-w-2xl text-5xl font-semibold tracking-tight text-white">
+            <h1 className="max-w-2xl text-5xl font-semibold tracking-tight text-white">
               Mock Interview Agent
             </h1>
             <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">

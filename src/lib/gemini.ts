@@ -20,9 +20,9 @@ export function getGeminiClient() {
   return geminiClient;
 }
 
-export function getGeminiModel(systemInstruction?: string) {
+export function getGeminiModel(systemInstruction?: string, modelName?: string) {
   return getGeminiClient().getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: modelName || process.env.GEMINI_MODEL || "gemini-2.5-flash",
     systemInstruction,
   });
 }

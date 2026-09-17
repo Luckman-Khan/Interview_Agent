@@ -1,10 +1,19 @@
 import Redis from "ioredis";
 
 let redisClient: Redis | null = null;
-let redisInitializationError: Error | null = null;
 
 function normalizeRedisUrl(redisUrl: string) {
-  return redisUrl.trim().replace(/^['"]|['"]$/g, "");
+  const normalized = redisUrl
+    .trim()
+    .replace(/^redis-cli\s+--tls\s+-u\s+/i, "")
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\(?=:\/\/|@)/g, "");
+
+  if (normalized.includes("upstash.io") && normalized.startsWith("redis://")) {
+    return normalized.replace(/^redis:\/\//, "rediss://");
+  }
+
+  return normalized;
 }
 
 export function getRedisClient() {
@@ -14,20 +23,26 @@ export function getRedisClient() {
     throw new Error("REDIS_URL is not configured.");
   }
 
-  if (redisInitializationError) {
-    throw redisInitializationError;
+  if (redisClient?.status === "end") {
+    redisClient = null;
   }
 
   if (!redisClient) {
     redisClient = new Redis(normalizeRedisUrl(redisUrl), {
       db: 0,
       lazyConnect: true,
-      maxRetriesPerRequest: 1,
+      maxRetriesPerRequest: 3,
+      retryStrategy(times) {
+        return Math.min(times * 250, 2000);
+      },
     });
 
     redisClient.on("error", (error) => {
-      redisInitializationError = error;
       console.error("Redis connection error:", error);
+    });
+
+    redisClient.on("end", () => {
+      redisClient = null;
     });
   }
 
@@ -46,7 +61,7 @@ export async function ensureRedisConnection() {
           ? error
           : new Error("Failed to connect to Redis.");
 
-      redisInitializationError = connectionError;
+      redisClient = null;
       throw connectionError;
     }
   }

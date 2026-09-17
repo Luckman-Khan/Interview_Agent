@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { logDetailedError, safeUrlHost } from "@/lib/debug";
 import { getGeminiModel, interviewBlueprintSchema } from "@/lib/gemini";
 import { ensureRedisConnection } from "@/lib/redis";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import type { InterviewBlueprint, RedisInterviewState } from "@/types";
+
+export const maxDuration = 60;
 
 function compactContext(text: string | null | undefined, maxChars: number) {
   const normalized = (text ?? "").replace(/\s+/g, " ").trim();
@@ -76,6 +79,7 @@ async function generateBlueprint(
 ) {
   const model = getGeminiModel(
     "You are an expert HR interviewer preparing for a job interview. Return valid JSON only.",
+    "gemini-3.1-flash-lite",
   );
 
   const prompt = conciseMode
@@ -115,17 +119,24 @@ Generate a compact interview blueprint as JSON with exactly these fields:
 Keep the JSON concise and do not include markdown.
 The opening_question must be broad, friendly, and skills-focused.`;
 
-  const response = await model.generateContent({
+  const streamResult = await model.generateContentStream({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: conciseMode ? 1024 : 2048,
       temperature: 0.2,
       responseMimeType: "application/json",
       responseSchema: interviewBlueprintSchema,
+      // @ts-expect-error -- thinkingConfig is supported by Gemini 2.5 but not yet in SDK types
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 
-  const blueprint = JSON.parse(extractJsonPayload(response.response.text())) as InterviewBlueprint;
+  let fullText = "";
+  for await (const chunk of streamResult.stream) {
+    fullText += chunk.text();
+  }
+
+  const blueprint = JSON.parse(extractJsonPayload(fullText)) as InterviewBlueprint;
 
   return {
     ...blueprint,
@@ -199,6 +210,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ blueprint });
   } catch (error) {
+    logDetailedError("Blueprint route failed", error, {
+      stage: "blueprint",
+      supabaseHost: safeUrlHost(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    });
+
     const message =
       error instanceof Error ? error.message : "Failed to generate interview blueprint.";
 

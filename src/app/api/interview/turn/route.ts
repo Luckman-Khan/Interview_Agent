@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logDetailedError, safeUrlHost } from "@/lib/debug";
 import { getGeminiModel } from "@/lib/gemini";
 import { ensureRedisConnection } from "@/lib/redis";
 import { getSupabaseServerClient } from "@/lib/supabase";
@@ -190,7 +191,13 @@ Rules you must follow:
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
           controller.close();
         } catch (error) {
-          console.error("Interview stream failed:", error);
+          logDetailedError("Interview stream failed", error, {
+            stage: "interview-stream",
+            sessionId,
+            redisKey,
+            questionForThisTurn,
+            geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+          });
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -214,6 +221,14 @@ Rules you must follow:
       },
     });
   } catch (error) {
+    logDetailedError("Interview turn route failed", error, {
+      stage: "interview-turn",
+      supabaseHost: safeUrlHost(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    });
+
     const message =
       error instanceof Error ? error.message : "Failed to continue interview.";
 
